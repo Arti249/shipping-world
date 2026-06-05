@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shipping World Tycoon</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0a1f3d; color: #0ff; margin: 0; padding: 20px; }
+        h1 { color: #0f0; text-align: center; }
+        .container { max-width: 900px; margin: auto; background: #112233; padding: 20px; border-radius: 10px; }
+        button { background: #0a5; color: white; padding: 10px 15px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0f8; }
+        .port, .ship { background: #223; padding: 12px; margin: 10px 0; border-radius: 8px; }
+        .ship { cursor: pointer; }
+        .log { height: 220px; overflow-y: scroll; background: #000; padding: 10px; border-radius: 5px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌍 Shipping World Tycoon</h1>
+        <div id="status"></div>
+        
+        <h2>Your Fleet</h2>
+        <div id="fleet"></div>
+        
+        <h2>Actions</h2>
+        <button onclick="buyShip()">Buy New Ship</button>
+        <button onclick="hireCrew()">Hire Crew</button>
+        <button onclick="upgradeShip()">Upgrade Selected Ship</button>
+        
+        <h3>Game Log</h3>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let player = { money: 25000, ships: [] };
+        const ports = {
+            "Cheap Harbor": { goods: 45, luxury: 110 },
+            "Trade Island": { goods: 85, luxury: 210 },
+            "Luxury Bay": { goods: 195, luxury: 520 },
+            "Home Port": { goods: 125, luxury: 310 }
+        };
+        let selected = 0;
+
+        function log(msg) {
+            const d = document.getElementById('log');
+            d.innerHTML += `<div>${new Date().toLocaleTimeString()} → ${msg}</div>`;
+            d.scrollTop = d.scrollHeight;
+        }
+
+        function updateStatus() {
+            document.getElementById('status').innerHTML = `<h2>Money: <span style="color:#0f0">$${player.money.toLocaleString()}</span></h2>`;
+        }
+
+        function renderFleet() {
+            let html = '';
+            if (player.ships.length === 0) html = '<p>No ships yet — buy your first one!</p>';
+            player.ships.forEach((s, i) => {
+                const cargo = s.cargo > 0 ? `${s.cargo}/${s.capacity} ${s.cargoType||''}` : 'Empty';
+                html += `
+                    <div class="ship" onclick="selectShip(${i})" style="${i===selected?'border:3px solid #0ff':''}">
+                        <strong>${s.name}</strong> @ ${s.location}<br>
+                        Cargo: ${cargo} | Speed: ${s.speed}s<br>
+                        <button onclick="event.stopImmediatePropagation();travel(${i})">Sail</button>
+                        <button onclick="event.stopImmediatePropagation();load(${i})">Load</button>
+                        <button onclick="event.stopImmediatePropagation();sell(${i})">Sell</button>
+                    </div>`;
+            });
+            document.getElementById('fleet').innerHTML = html;
+        }
+
+        function selectShip(i){ selected = i; renderFleet(); }
+
+        function buyShip(){
+            const opts = [{n:"Small Freighter",c:8000,cap:120,sp:4},{n:"Medium Trader",c:22000,cap:400,sp:6},{n:"Large Cargo",c:55000,cap:1100,sp:9}];
+            let ch = prompt("1: Small ($8000)\n2: Medium ($22000)\n3: Large ($55000)");
+            ch = parseInt(ch)-1;
+            if(ch>=0 && ch<3 && player.money >= opts[ch].c){
+                player.money -= opts[ch].c;
+                player.ships.push({name:opts[ch].n, capacity:opts[ch].cap, speed:opts[ch].sp, cargo:0, cargoType:null, location:"Home Port"});
+                log(`Purchased ${opts[ch].n}!`);
+                updateStatus(); renderFleet();
+            }
+        }
+
+        function travel(i){
+            const dest = prompt("Destination:\nCheap Harbor / Trade Island / Luxury Bay / Home Port");
+            if(!ports[dest]) return;
+            const ship = player.ships[i];
+            log(`${ship.name} sailing to ${dest}...`);
+            setTimeout(()=>{
+                ship.location = dest;
+                log(`${ship.name} arrived at ${dest}!`);
+                renderFleet();
+            }, ship.speed * 1000);
+        }
+
+        function load(i){
+            const ship = player.ships[i];
+            const p = ports[ship.location];
+            let t = prompt("1=Goods ("+p.goods+")\n2=Luxury ("+p.luxury+")");
+            t = t==="1" ? "goods" : "luxury";
+            let amt = parseInt(prompt("Amount? (max "+(ship.capacity-ship.cargo)+")"));
+            amt = Math.min(amt||0, ship.capacity-ship.cargo);
+            const cost = amt * p[t];
+            if(cost > 0 && player.money >= cost){
+                player.money -= cost;
+                ship.cargo += amt;
+                ship.cargoType = t;
+                log(`Loaded ${amt} ${t}`);
+                updateStatus(); renderFleet();
+            }
+        }
+
+        function sell(i){
+            const ship = player.ships[i];
+            if(ship.cargo <= 0) return alert("No cargo!");
+            const rev = ship.cargo * ports[ship.location][ship.cargoType];
+            player.money += rev;
+            log(`Sold ${ship.cargo} ${ship.cargoType} → +$${rev}`);
+            ship.cargo = 0; ship.cargoType = null;
+            updateStatus(); renderFleet();
+        }
+
+        function hireCrew(){
+            if(!player.ships.length) return;
+            const s = player.ships[selected];
+            if(player.money >= 1500){
+                player.money -= 1500;
+                s.speed = Math.max(2, s.speed-1);
+                log(`Crew hired — ${s.name} faster!`);
+                updateStatus(); renderFleet();
+            }
+        }
+
+        function upgradeShip(){
+            if(!player.ships.length) return;
+            const s = player.ships[selected];
+            if(player.money >= 15000){
+                player.money -= 15000;
+                s.capacity += 300;
+                s.speed = Math.max(2, s.speed-1);
+                log(`${s.name} upgraded!`);
+                updateStatus(); renderFleet();
+            }
+        }
+
+        // Start game
+        updateStatus();
+        renderFleet();
+        log("🌍 Welcome to Shipping World! Buy ships, trade, and dominate the seas.");
+        
+        // Auto-save
+        setInterval(() => localStorage.setItem('swSave', JSON.stringify(player)), 20000);
+        const save = localStorage.getItem('swSave');
+        if(save){ player = JSON.parse(save); log("Game loaded from previous session!"); updateStatus(); renderFleet(); }
+    </script>
+</body>
+</html>
